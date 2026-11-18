@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Tidit Tracker</string>
+    <string name="accessibility_service_desc">Tự động ghi lại thời gian mỗi khi ứng dụng Tidit được sử dụng để quẹt qua cửa.</string>
+</resources>
