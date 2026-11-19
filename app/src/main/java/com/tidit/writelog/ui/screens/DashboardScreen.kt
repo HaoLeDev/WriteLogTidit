@@ -69,7 +69,10 @@ import com.tidit.writelog.util.DateTimeUtils
 @Composable
 fun DashboardScreen(viewModel: TiditViewModel) {
     val context = LocalContext.current
-    val isServiceRunning by viewModel.isAccessibilityEnabled.collectAsState()
+    val isAccessibilityRunning by viewModel.isAccessibilityEnabled.collectAsState()
+    val isNotificationRunning by viewModel.isNotificationListenerEnabled.collectAsState()
+    val isBatteryIgnored by viewModel.isBatteryOptimizationIgnored.collectAsState()
+
     val targetPackage by viewModel.targetPackage.collectAsState()
     val allLogs by viewModel.allLogs.collectAsState()
     val todayCount by viewModel.todayLogCount.collectAsState()
@@ -79,6 +82,8 @@ fun DashboardScreen(viewModel: TiditViewModel) {
     var showDeleteSelectedDialog by remember { mutableStateOf(false) }
     var showPackageDialog by remember { mutableStateOf(false) }
 
+    val isFullyReady = isAccessibilityRunning && isNotificationRunning
+
     // Keep selected IDs in sync when logs are deleted
     LaunchedEffect(allLogs) {
         val validIds = allLogs.map { it.id }.toSet()
@@ -86,7 +91,7 @@ fun DashboardScreen(viewModel: TiditViewModel) {
     }
 
     LaunchedEffect(Unit) {
-        viewModel.refreshAccessibilityStatus(context)
+        viewModel.refreshAllStatuses(context)
     }
 
     // Group logs by date (dd/MM/yyyy)
@@ -102,11 +107,11 @@ fun DashboardScreen(viewModel: TiditViewModel) {
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        // Accessibility Service Status Banner
+        // Background Service & Diagnostic Card
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
-                containerColor = if (isServiceRunning) Color(0xFFE8F5E9) else Color(0xFFFFF3CD)
+                containerColor = if (isFullyReady) Color(0xFFE8F5E9) else Color(0xFFFFF9E6)
             ),
             shape = RoundedCornerShape(14.dp)
         ) {
@@ -116,39 +121,141 @@ fun DashboardScreen(viewModel: TiditViewModel) {
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(
-                        imageVector = if (isServiceRunning) Icons.Default.CheckCircle else Icons.Default.Warning,
+                        imageVector = if (isFullyReady) Icons.Default.CheckCircle else Icons.Default.Warning,
                         contentDescription = null,
-                        tint = if (isServiceRunning) StatusInGreen else Color(0xFF856404),
+                        tint = if (isFullyReady) StatusInGreen else Color(0xFFD97706),
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = if (isServiceRunning) "Giám sát Tidit: ĐANG HOẠT ĐỘNG" else "Chưa bật quyền giám sát ngầm",
+                            text = if (isFullyReady) "CHẠY NGẦM TỰ ĐỘNG: ĐÃ SẴN SÀNG" else "Cần kích hoạt quyền chạy ngầm",
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp,
-                            color = if (isServiceRunning) StatusInGreen else Color(0xFF856404)
+                            color = if (isFullyReady) StatusInGreen else Color(0xFFB45309)
                         )
                         Text(
-                            text = if (isServiceRunning)
-                                "Tự động ghi lại thời gian mỗi khi bạn mở/quẹt Tidit"
+                            text = if (isFullyReady)
+                                "Chỉ cần bật sáng màn hình và chạm cửa, log sẽ tự động lưu!"
                             else
-                                "Cần cấp quyền Trợ năng (Accessibility) để theo dõi app Tidit",
+                                "Bật đủ 2 quyền bên dưới để app tự động ghi log khi quẹt cửa",
                             fontSize = 12.sp,
-                            color = if (isServiceRunning) StatusInGreen.copy(alpha = 0.8f) else Color(0xFF856404)
+                            color = if (isFullyReady) StatusInGreen.copy(alpha = 0.85f) else Color(0xFF92400E)
                         )
                     }
                 }
 
-                if (!isServiceRunning) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Button(
-                        onClick = { viewModel.openAccessibilitySettings(context) },
-                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth()
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Permission Item 1: Quyền Trợ năng (Accessibility)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (isAccessibilityRunning) Icons.Default.CheckCircle else Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = if (isAccessibilityRunning) StatusInGreen else Color(0xFFDC2626),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "1. Trợ năng (Bắt Toast/Giao diện): " + (if (isAccessibilityRunning) "Đang bật" else "Chưa bật"),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isAccessibilityRunning) StatusInGreen else Color(0xFFDC2626)
+                        )
+                    }
+                    if (!isAccessibilityRunning) {
+                        TextButton(
+                            onClick = { viewModel.openAccessibilitySettings(context) }
+                        ) {
+                            Text("Bật", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = PrimaryBlue)
+                        }
+                    }
+                }
+
+                // Permission Item 2: Quyền đọc thông báo (Notification Access)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (isNotificationRunning) Icons.Default.CheckCircle else Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = if (isNotificationRunning) StatusInGreen else Color(0xFFDC2626),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "2. Quyền đọc thông báo quẹt ngầm: " + (if (isNotificationRunning) "Đang bật" else "Chưa cấp"),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isNotificationRunning) StatusInGreen else Color(0xFFDC2626)
+                        )
+                    }
+                    if (!isNotificationRunning) {
+                        TextButton(
+                            onClick = { viewModel.openNotificationSettings(context) }
+                        ) {
+                            Text("Cấp quyền", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = PrimaryBlue)
+                        }
+                    }
+                }
+
+                // Permission Item 3: Tối ưu pin (Battery Optimization)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (isBatteryIgnored) Icons.Default.CheckCircle else Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = if (isBatteryIgnored) StatusInGreen else Color(0xFFD97706),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "3. Tiết kiệm pin (Không tắt ngầm): " + (if (isBatteryIgnored) "Không hạn chế" else "Cần tắt tối ưu pin"),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isBatteryIgnored) StatusInGreen else Color(0xFFB45309)
+                        )
+                    }
+                    if (!isBatteryIgnored) {
+                        TextButton(
+                            onClick = { viewModel.requestIgnoreBatteryOptimization(context) }
+                        ) {
+                            Text("Bỏ giới hạn", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = PrimaryBlue)
+                        }
+                    }
+                }
+
+                // Tip: Kiểm tra thông báo trong Tidit
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "💡 Lưu ý: Đảm bảo đã bật 'Thông báo' trong app Tidit",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(
+                        onClick = { viewModel.openTiditAppSettings(context) }
                     ) {
-                        Text("Bật quyền giám sát trong Cài đặt")
+                        Text("Cài đặt Tidit", fontSize = 11.sp, color = SecondaryTeal)
                     }
                 }
             }

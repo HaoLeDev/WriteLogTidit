@@ -4,6 +4,7 @@
     <!-- NFC Permissions -->
     <uses-permission android:name="android.permission.NFC" />
     <uses-permission android:name="android.permission.NFC_TRANSACTION_EVENT" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-feature
         android:name="android.hardware.nfc"
         android:required="false" />
@@ -73,8 +74,7 @@
         <!-- NFC Transaction Receiver for background card swipe detection -->
         <receiver
             android:name=".receiver.NfcTransactionReceiver"
-            android:exported="true"
-            android:permission="android.permission.NFC_TRANSACTION_EVENT">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.nfc.action.TRANSACTION_DETECTED" />
                 <data android:scheme="nfc" android:host="secure-element" />

@@ -50,7 +50,7 @@ class MainActivity : ComponentActivity() {
                                 )
                             },
                             actions = {
-                                IconButton(onClick = { viewModel.refreshAccessibilityStatus(this@MainActivity) }) {
+                                IconButton(onClick = { viewModel.refreshAllStatuses(this@MainActivity) }) {
                                     Icon(
                                         imageVector = Icons.Default.Refresh,
                                         contentDescription = "Làm mới trạng thái",
@@ -78,6 +78,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        viewModel.refreshAccessibilityStatus(this)
+        viewModel.refreshAllStatuses(this)
     }
 }

@@ -29,7 +29,8 @@ class TiditNotificationListener : NotificationListenerService() {
 
         val targetPackage = TiditAccessibilityService.getTargetPackage(this)
         val isTargetApp = packageName.equals(targetPackage, ignoreCase = true) ||
-                packageName.equals("com.lgcns.didid", ignoreCase = true)
+                packageName.contains("didid", ignoreCase = true) ||
+                packageName.contains("lgcns", ignoreCase = true)
 
         if (!isTargetApp) return
 
@@ -41,14 +42,16 @@ class TiditNotificationListener : NotificationListenerService() {
         val extras = sbn.notification.extras
         val title = extras?.getString(Notification.EXTRA_TITLE) ?: ""
         val text = extras?.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
+        val subText = extras?.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString() ?: ""
+        val ticker = sbn.notification.tickerText?.toString() ?: ""
 
-        val detail = listOf(title, text).filter { it.isNotBlank() }.joinToString(" - ")
+        val detail = listOf(title, text, subText, ticker).filter { it.isNotBlank() }.joinToString(" - ")
 
         lastRecordedTime = currentTime
 
         serviceScope.launch {
             TiditApp.instance.repository.recordLog(
-                source = "Tidit (Quẹt qua cửa)",
+                source = "Tidit (Thông báo)",
                 note = detail.ifBlank { "Quẹt thẻ thành công (NFC ngầm)" }
             )
         }

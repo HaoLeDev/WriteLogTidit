@@ -5,6 +5,8 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.app.Application
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.os.PowerManager
 import android.provider.Settings
 import android.view.accessibility.AccessibilityManager
 import android.widget.Toast
@@ -25,6 +27,8 @@ class TiditViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = (application as TiditApp).repository
 
     val isAccessibilityEnabled = MutableStateFlow(false)
+    val isNotificationListenerEnabled = MutableStateFlow(false)
+    val isBatteryOptimizationIgnored = MutableStateFlow(false)
     val targetPackage = MutableStateFlow(TiditAccessibilityService.getTargetPackage(application))
 
     val allLogs: StateFlow<List<AccessLog>> = repository.allLogs
@@ -36,14 +40,23 @@ class TiditViewModel(application: Application) : AndroidViewModel(application) {
     val todayLogCount: StateFlow<Int> = repository.getTodayLogCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
-    fun refreshAccessibilityStatus(context: Context) {
+    fun refreshAllStatuses(context: Context) {
+        // 1. Accessibility Service status
         val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager
         val enabledList = am?.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK) ?: emptyList()
-        val isEnabled = enabledList.any {
+        val isAccEnabled = enabledList.any {
             it.resolveInfo.serviceInfo.packageName == context.packageName &&
                     it.resolveInfo.serviceInfo.name == TiditAccessibilityService::class.java.name
         }
-        isAccessibilityEnabled.value = isEnabled || TiditAccessibilityService.isRunning
+        isAccessibilityEnabled.value = isAccEnabled || TiditAccessibilityService.isRunning
+
+        // 2. Notification Listener status
+        val flat = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners") ?: ""
+        isNotificationListenerEnabled.value = flat.contains(context.packageName)
+
+        // 3. Battery Optimization status
+        val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+        isBatteryOptimizationIgnored.value = pm?.isIgnoringBatteryOptimizations(context.packageName) ?: true
     }
 
     fun openAccessibilitySettings(context: Context) {
@@ -54,6 +67,48 @@ class TiditViewModel(application: Application) : AndroidViewModel(application) {
             context.startActivity(intent)
         } catch (e: Exception) {
             Toast.makeText(context, "Không thể mở Cài đặt Trợ năng", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun openNotificationSettings(context: Context) {
+        try {
+            val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(context, "Không thể mở Cài đặt Quyền thông báo", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun requestIgnoreBatteryOptimization(context: Context) {
+        try {
+            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                data = Uri.parse("package:${context.packageName}")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            try {
+                val fallbackIntent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(fallbackIntent)
+            } catch (ex: Exception) {
+                Toast.makeText(context, "Không thể mở Cài đặt Tiết kiệm pin", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    fun openTiditAppSettings(context: Context) {
+        try {
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.parse("package:${targetPackage.value}")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(context, "Không tìm thấy ứng dụng ${targetPackage.value}", Toast.LENGTH_SHORT).show()
         }
     }
 

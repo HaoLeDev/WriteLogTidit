@@ -37,13 +37,16 @@ class TiditAccessibilityService : AccessibilityService() {
 
         val targetPackage = getTargetPackage(this)
         val isTargetApp = packageName.equals(targetPackage, ignoreCase = true) ||
-                packageName.equals("com.lgcns.didid", ignoreCase = true)
+                packageName.contains("didid", ignoreCase = true) ||
+                packageName.contains("lgcns", ignoreCase = true)
 
         if (!isTargetApp) return
 
-        // Only trigger on window state change or user interaction
+        // Bắt các sự kiện: Toast/Thông báo nổi, Mở app/dialog, Thay đổi nội dung, hoặc Click
         val eventType = event.eventType
-        if (eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
+        if (eventType != AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED &&
+            eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
+            eventType != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED &&
             eventType != AccessibilityEvent.TYPE_VIEW_CLICKED
         ) {
             return
@@ -51,19 +54,29 @@ class TiditAccessibilityService : AccessibilityService() {
 
         val currentTime = System.currentTimeMillis()
         if (currentTime - lastRecordedTime < debounceIntervalMs) {
-            // Ignored due to debounce
+            // Bỏ qua do debounce (tránh ghi đúp trong 15s)
             return
         }
 
         lastRecordedTime = currentTime
 
-        // Extract any meaningful text in the UI
+        // Trích xuất nội dung văn bản hiển thị
         val eventText = event.text?.joinToString(" ")?.trim() ?: ""
-        val note = if (eventText.isNotBlank()) "Nội dung: $eventText" else "Mở ứng dụng Tidit"
+        val contentDesc = event.contentDescription?.toString()?.trim() ?: ""
+        val textInfo = listOf(eventText, contentDesc).filter { it.isNotBlank() }.joinToString(" - ")
+
+        val (source, note) = when (eventType) {
+            AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED -> 
+                Pair("Tidit (Toast/Thông báo)", if (textInfo.isNotBlank()) "Nội dung: $textInfo" else "Thông báo xác thực quẹt thẻ")
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> 
+                Pair("Tidit (Quẹt qua cửa)", if (textInfo.isNotBlank()) "Giao diện: $textInfo" else "Mở ứng dụng Tidit")
+            else -> 
+                Pair("Tidit (Tác vụ nền)", if (textInfo.isNotBlank()) "Chi tiết: $textInfo" else "Xác thực cửa ngầm")
+        }
 
         serviceScope.launch {
             TiditApp.instance.repository.recordLog(
-                source = "Tidit (Quẹt qua cửa)",
+                source = source,
                 note = note
             )
         }
